@@ -1,4 +1,4 @@
-package com.niit.retailstore;
+package com.niit.retailstore.sales;
 
 import java.io.IOException;
 
