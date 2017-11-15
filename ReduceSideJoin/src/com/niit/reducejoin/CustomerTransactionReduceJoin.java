@@ -15,6 +15,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
 public class CustomerTransactionReduceJoin {
 
+	// Mapper class for custs
 	public static class CustomerMapper extends Mapper<LongWritable, Text, Text, Text>
 	{
 		@Override
@@ -28,6 +29,7 @@ public class CustomerTransactionReduceJoin {
 		}	
 	}
 	
+	// Mapper class for txns1.txt
 	public static class TransactionMapper extends Mapper<LongWritable, Text, Text, Text>
 	{
 		@Override
@@ -41,6 +43,7 @@ public class CustomerTransactionReduceJoin {
 		}
 	}
 	
+	// Reducer class for both Customer and Transaction Mapper class output
 	public static class CustTransReducer extends Reducer<Text, Text, Text, Text>
 	{
 
@@ -71,6 +74,7 @@ public class CustomerTransactionReduceJoin {
 		
 	}
 	
+	// Main method
 	public static void main(String[] args) throws Exception {
 		
 		Configuration conf = new Configuration();
@@ -79,6 +83,8 @@ public class CustomerTransactionReduceJoin {
 		job.setJarByClass(CustomerTransactionReduceJoin.class);
 		job.setReducerClass(CustTransReducer.class);
 		
+		// adding multiple input from the terminal args[0] will be first file for input i.e. custs
+		// and args[1] will be second input file i.e txns1.txt
 		MultipleInputs.addInputPath(job, new Path(args[0]), TextInputFormat.class, CustomerMapper.class);
 		MultipleInputs.addInputPath(job, new Path(args[1]), TextInputFormat.class, TransactionMapper.class);
 		
