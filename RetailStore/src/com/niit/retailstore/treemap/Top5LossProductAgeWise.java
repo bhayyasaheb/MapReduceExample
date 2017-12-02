@@ -156,7 +156,7 @@ public class Top5LossProductAgeWise {
 	}
 	
 	/*
-	 * Driver Code which contains configurations and job related all information
+	 * Driver Code which contains configuration and job related all information
 	 */
 	public static void main(String[] args) throws Exception {
 		
