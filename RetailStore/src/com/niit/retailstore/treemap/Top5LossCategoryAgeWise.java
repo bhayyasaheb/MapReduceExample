@@ -132,8 +132,8 @@ public class Top5LossCategoryAgeWise {
 				 if(repToRecordMap.size() > 5)
 				 {
 					// TreeMap by default sort key ascending order
-					 // if TreeMap size > 5 then remove first key 
-					 // that will remove lowest value of loss from TreeMap
+					// if TreeMap size > 5 then remove first key 
+					// that will remove lowest value of loss from TreeMap
 					 repToRecordMap.remove(repToRecordMap.firstKey());
 				 }
 				// context.write(key, new LongWritable(loss));
