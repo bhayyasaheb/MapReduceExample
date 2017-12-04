@@ -25,17 +25,27 @@ public class Top5ViableProductAgeWise {
 	 */
 	public static class Top5ViableMapper extends Mapper<LongWritable, Text, Text, Text>
 	{
-
+		
 		@Override
 		protected void map(LongWritable key, Text value, Context context)throws IOException, InterruptedException 
 		{
 			String[] part = value.toString().split(";");
-			String product = part[5]; 
+			String product = part[5];
+			String age = part[2];
+			long cost = Long.parseLong(part[7]);
+			long sales = Long.parseLong(part[8]);
+						
+			long viable = sales-cost;
 			
-			// here key is product and value is whole value
-			context.write(new Text(product), new Text(value));
+			String myValue = product+","+age+","+viable;
+			
+			if(viable > 0)
+			{
+				// putting product as key and product,age,viable as value in mapper output
+				context.write(new Text(product), new Text(myValue));
+			}
+			
 		}
-		
 	}
 	
 	/*
@@ -47,8 +57,8 @@ public class Top5ViableProductAgeWise {
 		@Override
 		public int getPartition(Text key, Text value, int numReduceTasks) {
 			
-			String[] str = value.toString().split(";");
-			char age = str[2].charAt(0);
+			String[] str = value.toString().split(",");
+			char age = str[1].charAt(0);
 			
 			if(age == 'A')
 			{
@@ -94,66 +104,49 @@ public class Top5ViableProductAgeWise {
 	 */
 	public static class Top5ViableReducer extends Reducer<Text, Text, NullWritable, Text>
 	{
-		private TreeMap<Long,Text> repToRecordMap = new TreeMap<Long,Text>();
+		private TreeMap<Long,Text> treeMap = new TreeMap<Long,Text>();
 		@Override
 		protected void reduce(Text key, Iterable<Text> values,Context context)throws IOException, InterruptedException 
 		{
-			 long totalCost = 0;
-			 long totalSales = 0;
+			 long totalViable = 0;
 			 String age = "";
+			 String product = "";
+			 
 			 for(Text val : values)
 			 {
-				 String[] str = val.toString().split(";");
-				 long cost = Long.parseLong(str[7]);
-				 long sales = Long.parseLong(str[8]);
-				 age = str[2];
+				 String[] str = val.toString().split(",");
+				 product = str[0];
+				 age = str[1];
+				 long viable = Long.parseLong(str[2]);
 				 
-				 totalCost += cost;
-				 totalSales += sales;
+				 totalViable += viable;
 			 }
 			 
-			 long viable = totalSales - totalCost;
+			 String myTotal = String.format("%d",totalViable);
+			 String myValue = product + ","+age+","+myTotal;
 			 
-			 // putting records in TreeMap if viable is +ve
-			 if(viable > 0)
+			 // in TreeMap key = totalViable and value = product,age,totalViable
+			 treeMap.put(totalViable, new Text(myValue));
+			 
+			 if(treeMap.size() > 5)
 			 {
-				 // here key is  product which coming from mapper output key
-				 String myValue = key.toString();
-				 String myTotal = String.format("%d",viable);
-				 
-				// in myValue putting myValue=product, age, myTotal=viable which (difference between sales-cost)
-				 myValue = myValue + ","+age+","+myTotal;
-				 
-				 // in TreeMap key = viable and value = product,age,viable
-				 repToRecordMap.put(new Long(viable), new Text(myValue));
-				 
-				 if(repToRecordMap.size() > 5)
-				 {
-					 // TreeMap by default sort key ascending order
-					 // if TreeMap size > 5 then remove first key 
-					 // that will remove lowest value of viable from TreeMap
-					 repToRecordMap.remove(repToRecordMap.firstKey());
-				 }
-					 
-				// context.write(key, new LongWritable(viable));
-				
+				 // TreeMap by default sort key ascending order
+				 // if TreeMap size > 5 then remove first key 
+				 // that will remove lowest value of viable from TreeMap
+				 treeMap.remove(treeMap.firstKey());
 			 }
-			
 		}
+		
 		@Override
 		protected void cleanup(Context context)throws IOException, InterruptedException 
 		{
 			// here we printing the TreeMap in descending order using descendingMap()
-			for(Text top : repToRecordMap.descendingMap().values())
+			for(Text top : treeMap.descendingMap().values())
 			{
 				// Writing only value in output of Reducer, key is NullWritable.get() it will not write anything in output 
 				context.write(NullWritable.get(), top);
 			}
 		}
-		
-		
-		
-		
 	}
 	
 	
@@ -173,7 +166,6 @@ public class Top5ViableProductAgeWise {
 		
 		job.setReducerClass(Top5ViableReducer.class);
 	
-		
 		job.setMapOutputKeyClass(Text.class);
 		job.setMapOutputValueClass(Text.class);
 		
