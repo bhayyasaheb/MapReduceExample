@@ -32,9 +32,19 @@ public class Top5LossProductAgeWise {
 		{
 			String[] part = value.toString().split(";");
 			String product = part[5];
+			String age = part[2];
+			long cost = Long.parseLong(part[7]);
+			long sales = Long.parseLong(part[8]);
+						
+			long loss = cost-sales;
 			
-			// here key is product and value is whole value
-			context.write(new Text(product), new Text(value));
+			String myValue = product+","+age+","+loss;
+			
+			if(loss > 0)
+			{
+				// putting product as key and product,age,loss as value in mapper output
+				context.write(new Text(product), new Text(myValue));
+			}
 		}
 		
 	}
@@ -48,8 +58,8 @@ public class Top5LossProductAgeWise {
 		@Override
 		public int getPartition(Text key, Text value, int numReduceTasks) {
 			
-			String[] str = value.toString().split(";");
-			char age = str[2].charAt(0);
+			String[] str = value.toString().split(",");
+			char age = str[1].charAt(0);
 			
 			if(age == 'A')
 			{
@@ -95,59 +105,46 @@ public class Top5LossProductAgeWise {
 	 */
 	public static class Top5ViableReducer extends Reducer<Text, Text, NullWritable, Text>
 	{
-		private TreeMap<Long,Text> repToRecordMap = new TreeMap<Long,Text>();
+		private TreeMap<Long,Text> treeMap = new TreeMap<Long,Text>();
 		
 		@Override
 		protected void reduce(Text key, Iterable<Text> values,Context context)throws IOException, InterruptedException 
 		{
-			 long totalCost = 0;
-			 long totalSales = 0;
+			 long totalLoss = 0;
+			 String product = "";
 			 String age = "";
 			 
 			 for(Text val : values)
 			 {
-				 String[] str = val.toString().split(";");
-				 long cost = Long.parseLong(str[7]);
-				 long sales = Long.parseLong(str[8]);
-				 age = str[2];
+				 String[] str = val.toString().split(",");
+				 product = str[0];
+				 age = str[1];
+				 long loss = Long.parseLong(str[2]);
 				 
-				 totalCost += cost;
-				 totalSales += sales;
+				 totalLoss += loss;
 			 }
 			 
-			 long loss =   totalCost - totalSales;
+			 String myTotal = String.format("%d",totalLoss);
+			 String myValue = product + ","+age+","+myTotal;
 			 
-			// putting records in TreeMap if loss is +ve
-			 if(loss > 0)
-			 {
-				 // here key is  product which coming from mapper output key
-				 String myValue = key.toString();
-				 String myTotal = String.format("%d",loss);
-				 
-				// in myValue putting myValue=product, age, myTotal=loss which (difference between cost-sales)
-				 myValue = myValue + ","+age+","+myTotal;
-				 
-				// in TreeMap key = loss and value = product,age,loss
-				 repToRecordMap.put(new Long(loss), new Text(myValue));
-				
-				 if(repToRecordMap.size() > 5)
-				 {
-					// TreeMap by default sort key ascending order
-					 // if TreeMap size > 5 then remove first key 
-					 // that will remove lowest value of loss from TreeMap
-					 repToRecordMap.remove(repToRecordMap.firstKey());
-				 }
-				 //context.write(key, new LongWritable(loss));
-				
-			 }
+			// in TreeMap key = loss and value = product,age,totalLoss
+			 treeMap.put(new Long(totalLoss), new Text(myValue));
 			
+			 if(treeMap.size() > 5)
+			 {
+				// TreeMap by default sort key ascending order
+				 // if TreeMap size > 5 then remove first key 
+				 // that will remove lowest value of loss from TreeMap
+				 treeMap.remove(treeMap.firstKey());
+			 }
+		
 		}
 		
 		@Override
 		protected void cleanup(Context context)throws IOException, InterruptedException 
 		{
 			// here we printing the TreeMap in descending order using descendingMap()
-			for(Text top : repToRecordMap.descendingMap().values())
+			for(Text top : treeMap.descendingMap().values())
 			{
 				// Writing only value in output of Reducer, key is NullWritable.get() it will not write anything in output 
 				context.write(NullWritable.get(), top);
