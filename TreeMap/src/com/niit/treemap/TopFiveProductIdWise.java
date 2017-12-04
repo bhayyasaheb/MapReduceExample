@@ -1,6 +1,7 @@
 package com.niit.treemap;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.TreeMap;
 
 import org.apache.hadoop.conf.Configuration;
@@ -16,69 +17,72 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
 public class TopFiveProductIdWise {
 
-	public static class Top5Mapper extends Mapper<LongWritable, Text, Text, Text>
+	public static class Top5Mapper extends Mapper<LongWritable, Text, NullWritable, Text>
 	{
-
+		TreeMap<Integer,Text> map1 = new TreeMap<Integer,Text>();
+		
 		@Override
 		protected void map(LongWritable key, Text value, Context context)throws IOException, InterruptedException 
 		{
 			String[] token = value.toString().split(",");
-			//int id = Integer.parseInt(token[0]);
-			String id = token[0];
 			
-			context.write(new Text(id), new Text(value));
+			//id is productId
+			int id = Integer.parseInt(token[0]);
+			
+			// myVal is productId and its value 
+			String myVal = token[0]+","+token[1];
+			
+			// putting productId as key and value as myVal in TreeMap
+			map1.put(id, new Text(myVal));
+			
+			// TreeMap Sort key by default in ascending order
+			// when TreeMap size > 5 then remove first key
+			if(map1.size()>5)
+			{
+				map1.remove(map1.firstKey());
+			}
+		}
+		
+		@Override
+		protected void cleanup(Context context) throws IOException, InterruptedException 
+		{
+			for(Map.Entry<Integer, Text> entry : map1.entrySet())
+			{
+				// putting whole TreeMap in value of cleanup method
+				// value contains productId and its values
+				context.write(NullWritable.get(), entry.getValue());
+			}
 		}
 		
 	}
 	
-	public static class Top5Reducer extends Reducer<Text, Text, NullWritable, Text>
+	public static class Top5Reducer extends Reducer<NullWritable, Text, NullWritable, Text>
 	{
-		TreeMap<Integer, Text> treeMap =  new TreeMap<Integer, Text>();
+		TreeMap<Integer, Text> map2 =  new TreeMap<Integer, Text>();
 		@Override
-		protected void reduce(Text key, Iterable<Text> values,Context context)throws IOException, InterruptedException 
+		protected void reduce(NullWritable key, Iterable<Text> values,Context context)throws IOException, InterruptedException 
 		{
 			int id = 0;
-			String myValue = "";
+			
 			for(Text val : values)
 			{
 				String[] token = val.toString().split(",");
-				 id = Integer.parseInt(token[0]);
-				 //myValue = myValue + Integer.parseInt(token[1]);
-				 myValue = token[1];
 				
-				 // in myValue putting id and value of that id and passing to the TreeMap
-				 myValue = id + "," + myValue;
-					
-				 treeMap.put(id, new Text(myValue));
-				
-				 // TreeMap Sort key by default in ascending order
-				 // when TreeMap size > 5 then remove first key
-				 if(treeMap.size() > 5)
-				 {
-					treeMap.remove(treeMap.firstKey());
-				 }	 
+				// id is productId
+				id = Integer.parseInt(token[0]);
 				 
+				// putting productId as key and mapper output value as value in TreeMap
+				map2.put(new Integer(id), new Text(val)); 
 			}
 			
+			// here we printing the TreeMap values in descending order using descendingMap()
+			for(Text t : map2.descendingMap().values())
+			{
+				// Writing only value in output of Reducer, key is NullWritable.get() it will not write anything in output
+				context.write(NullWritable.get(), t);
+			}
 			
 		}
-		@Override
-		protected void cleanup(Context context)throws IOException, InterruptedException 
-		{
-			try {
-				// here we printing the TreeMap in descending order using descendingMap()
-				for(Text top : treeMap.descendingMap().values())
-				{	
-					// Writing only value in output of Reducer, key is NullWritable.get() it will not write anything in output 
-					context.write(NullWritable.get(), top);
-				}
-			} catch (Exception e) {
-				System.out.println(e.getMessage());			
-				}
-			
-		}
-		
-		
 		
 	}
 	
@@ -90,10 +94,7 @@ public class TopFiveProductIdWise {
 		job.setJarByClass(TopFiveProductIdWise.class);
 		job.setMapperClass(Top5Mapper.class);
 		job.setReducerClass(Top5Reducer.class);
-		
-		job.setMapOutputKeyClass(Text.class);
-		job.setMapOutputValueClass(Text.class);
-		
+
 		job.setOutputKeyClass(NullWritable.class);
 		job.setOutputValueClass(Text.class);
 		
